@@ -1,0 +1,6 @@
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\8.Компонентно тестване и mocking\6. Unit-Testing-and-Mocking-Demo\WebCrawler\bin\Debug\WebCrawler.exe.config
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\8.Компонентно тестване и mocking\6. Unit-Testing-and-Mocking-Demo\WebCrawler\bin\Debug\WebCrawler.exe
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\8.Компонентно тестване и mocking\6. Unit-Testing-and-Mocking-Demo\WebCrawler\bin\Debug\WebCrawler.pdb
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\8.Компонентно тестване и mocking\6. Unit-Testing-and-Mocking-Demo\WebCrawler\obj\Debug\04. WebCrawler.csprojResolveAssemblyReference.cache
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\8.Компонентно тестване и mocking\6. Unit-Testing-and-Mocking-Demo\WebCrawler\obj\Debug\WebCrawler.exe
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\8.Компонентно тестване и mocking\6. Unit-Testing-and-Mocking-Demo\WebCrawler\obj\Debug\WebCrawler.pdb

@@ -1,0 +1,11 @@
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\8.Компонентно тестване и mocking\6. Unit-Testing-and-Mocking-Demo\RpgGame.Tests\bin\Debug\RpgGame.Tests.dll
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\8.Компонентно тестване и mocking\6. Unit-Testing-and-Mocking-Demo\RpgGame.Tests\bin\Debug\RpgGame.Tests.pdb
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\8.Компонентно тестване и mocking\6. Unit-Testing-and-Mocking-Demo\RpgGame.Tests\bin\Debug\DependencyInversion.exe
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\8.Компонентно тестване и mocking\6. Unit-Testing-and-Mocking-Demo\RpgGame.Tests\bin\Debug\Moq.dll
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\8.Компонентно тестване и mocking\6. Unit-Testing-and-Mocking-Demo\RpgGame.Tests\bin\Debug\Ninject.dll
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\8.Компонентно тестване и mocking\6. Unit-Testing-and-Mocking-Demo\RpgGame.Tests\bin\Debug\DependencyInversion.pdb
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\8.Компонентно тестване и mocking\6. Unit-Testing-and-Mocking-Demo\RpgGame.Tests\bin\Debug\Moq.xml
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\8.Компонентно тестване и mocking\6. Unit-Testing-and-Mocking-Demo\RpgGame.Tests\bin\Debug\Ninject.xml
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\8.Компонентно тестване и mocking\6. Unit-Testing-and-Mocking-Demo\RpgGame.Tests\obj\Debug\RpgGame.Tests.csprojResolveAssemblyReference.cache
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\8.Компонентно тестване и mocking\6. Unit-Testing-and-Mocking-Demo\RpgGame.Tests\obj\Debug\RpgGame.Tests.dll
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\8.Компонентно тестване и mocking\6. Unit-Testing-and-Mocking-Demo\RpgGame.Tests\obj\Debug\RpgGame.Tests.pdb

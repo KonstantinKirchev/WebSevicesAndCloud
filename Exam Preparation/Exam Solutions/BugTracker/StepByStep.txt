@@ -1,0 +1,1057 @@
+Преди да започна със задачата отивам в WebApiConfig файла и добавям следният ред
+config.Formatters.JsonFormatter.SerializerSettings.ContractResolver = new CamelCasePropertyNamesContractResolver();
+
+... след това си правя BaseApiController
+    
+    public class BaseApiController : ApiController
+    {
+        //public BaseApiController()
+        //{
+        //    this.Data = new BugTrackerDbContext();
+        //}
+
+        //protected BugTrackerDbContext Data { get; set; }
+
+        protected IBugsUnitOfWork data;
+
+        public BaseApiController(IBugsUnitOfWork data)
+        {
+            this.data = data;
+        }
+
+        public BaseApiController() 
+            : this (new BugsUnitOfWork())
+        {        
+        }
+    }
+
+... сега вече съм готов да започна работа по контролерите :)
+
+    [RoutePrefix("api/bugs")]
+    public class BugsController : BaseApiController
+    {
+        public BugsController(IBugsUnitOfWork data)
+            : base(data)
+        {
+        }
+
+        public BugsController()
+        {
+        }
+
+Problem 2. Returns the list of bugs sorted by date from the latest to the earliest as JSON array. 
+
+        // GET: api/Bugs
+        [HttpGet]
+        public IHttpActionResult GetBugs()
+        {
+            var bugs = this.data.Bugs.All()
+                .OrderByDescending(b => b.DateCreated)
+                .ThenByDescending(b => b.Id)
+                .Select(BugViewModel.Create());
+
+            return this.Ok(bugs);
+        }
+
+    public class BugViewModel
+    {
+        public int Id { get; set; }
+
+        public string Title { get; set; }
+
+        public string Status { get; set; }
+
+        public string Author { get; set; }
+
+        public DateTime DateCreated { get; set; }
+
+        public static Expression<Func<Bug, BugViewModel>> Create()
+        {
+            return b => new BugViewModel()
+            {
+                Id = b.Id,
+                Title = b.Title,
+                Status = b.Status.ToString(),
+                Author = b.Author == null ? null : b.Author.UserName,
+                DateCreated = b.DateCreated
+            };
+        } 
+    }
+
+Problem 3. Returned when the requested bug exists. Holds the bug details as JSON object
+
+        // GET: api/Bugs/5
+        [ResponseType(typeof(Bug))]
+        [Route("{id}")]
+        [HttpGet]
+        public IHttpActionResult GetBug(int id)
+        {
+
+            var bug = this.data.Bugs.All()
+                .Where(b => b.Id == id)
+                .Select(b => new BugByIdViewModel
+                {
+                    Id = b.Id,
+                    Title = b.Title,
+                    Description = b.Description,
+                    Status = b.Status.ToString(),
+                    Author = b.Author == null ? null : b.Author.UserName,
+                    DateCreated = b.DateCreated,
+                    Comments = b.Comments
+                        .OrderByDescending(c => c.DateCreated)
+                        .ThenByDescending(c => c.Id)
+                        .Select(c => new CommentViewModel()
+                        {
+                            Id = c.Id,
+                            Text = c.Text,
+                            Author = c.Author == null ? null : c.Author.UserName,
+                            DateCreated = c.DateCreated
+                        })
+                })
+                .FirstOrDefault();
+
+            if (bug == null)
+            {
+                return NotFound();
+            }
+
+            return Ok(bug);
+        }
+
+    public class BugByIdViewModel
+    {
+        public int Id { get; set; }
+
+        public string Title { get; set; }
+
+        public string Description { get; set; }
+
+        public string Status { get; set; }
+
+        public string Author { get; set; }
+
+        public DateTime DateCreated { get; set; }
+
+        public IEnumerable<CommentViewModel> Comments { get; set; }
+    }
+
+    public class CommentViewModel
+    {
+        public int Id { get; set; }
+
+        public string Text { get; set; }
+
+        public string Author { get; set; }
+
+        public DateTime DateCreated { get; set; }
+    }
+
+Problem 7. Write a REST service to edit existing bug. Bug id is passed as part of the URI. 
+The changed bug properties are sent in the HTTP body as form data (URL-encoded). 
+Only title, description and status might be changed. 
+If the HTTP body holds non-empty title, it should be updated, but if title is missing, it stays unchanged. 
+The same applies for the other properties. Don not change properties not listed in the request body.
+        
+        // PATCH: api/Bugs/{id}
+        [ResponseType(typeof(void))]
+        [HttpPatch]
+        [Route("{id}")]
+        public IHttpActionResult PatchBug(int id, EditBugBindingModel bugData)
+        {
+            if (bugData == null)
+            {
+                return this.BadRequest("Missing bug data to patch.");
+            }
+
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            var bug = this.data.Bugs.Find(id);
+
+            if (bug == null)
+            {
+                return this.NotFound();
+            }
+
+            if (bugData.Title != null)
+            {
+                bug.Title = bugData.Title;
+            }
+
+            if (bugData.Description != null)
+            {
+                bug.Description = bugData.Description;
+            }
+
+            if (bugData.Status != null)
+            {
+                BugStatus newStatus;
+                bool isSuccessful = Enum.TryParse(bugData.Status, out newStatus);
+                
+                if (!isSuccessful)
+                {
+                    return this.BadRequest("Invalid bug status.");
+                }
+                
+                bug.Status = newStatus;
+            }
+
+            this.data.SaveChanges();
+
+            return this.Ok(new
+            {
+                Message = "Bug #" + id + " patched."
+            });
+        }
+
+    public class EditBugBindingModel
+    {
+        public string Title { get; set; }
+
+        public string Description { get; set; }
+
+        public string Status { get; set; }
+    }
+
+Problem 6. Write a REST service to submit a new bug. The bug title and description are posted in the HTTP body 
+as form data (URL-encoded). The title is required. The description is optional. New bugs take a status "Open" 
+and the current date and time as creation date.
+If a valid user's bearer authorization access_token is given in the request headers, the bug author should be the logged-in user. 
+Otherwise, the bug author is null (anonymous bug submission).
+
+        // POST: api/Bugs
+        [ResponseType(typeof(Bug))]
+        public IHttpActionResult PostBug(BugBindingModel model)
+        {
+ 
+            if (model == null)
+            {
+                return this.BadRequest("Missing model data.");
+            }
+            
+            if (!ModelState.IsValid)
+            {
+                return this.BadRequest(ModelState);
+            }
+
+            var currentUserId = User.Identity.GetUserId();
+            var user = this.data.Users.Find(currentUserId);
+
+            var bug = new Bug()
+            {
+                Title = model.Title,
+                Description = model.Description,
+                Status = BugStatus.Open,
+                DateCreated = DateTime.Now,
+                Author = user
+            };
+
+            this.data.Bugs.Add(bug);
+            this.data.SaveChanges();
+
+            if (user != null)
+            {
+                return CreatedAtRoute("DefaultApi", new { id = bug.Id }, new { bug.Id, Author = user.UserName, Message = "User bug submitted."});
+            }
+            return CreatedAtRoute("DefaultApi", new { id = bug.Id }, new { bug.Id, Message = "Anonymous bug submitted."});
+        }
+
+    public class BugBindingModel
+    {
+        [Required]
+        public string Title { get; set; }
+
+        public string Description { get; set; }
+    }
+
+Problem 8. Write a REST service to delete a bug by ID. When a bug is deleted, all its comments are also deleted.
+
+        // DELETE: api/Bugs/5
+        [ResponseType(typeof(Bug))]
+        [HttpDelete]
+        [Route("{id}")]
+        public IHttpActionResult DeleteBug(int id)
+        {
+            var bug = this.data.Bugs.Find(id);
+            
+            if (bug == null)
+            {
+                return NotFound();
+            }
+
+            this.data.Bugs.Remove(bug);
+            this.data.SaveChanges();
+
+            return Ok(new
+            {
+                Message = "Bug #" + bug.Id + " deleted."
+            });
+        }
+
+Problem 9. Write a REST service to list all bugs matching given filter. The filter is given as set of URL parameters. 
+It may hold keyword, statuses and author. If a keyword is given, only bugs holding this keyword in its title should be returned. 
+Statuses may consist of one or several statuses, separated by |, e.g. Closed|InProgress. If statuses are given, 
+the result returned bugs should be in one of these statuses. If an author username is given, 
+only bugs from the specified author should be returned.
+
+        [HttpGet]
+        [Route("filter")]
+        public IHttpActionResult FilterBugs([FromUri]FilterBugsBindingModel model)
+        {
+            var bugs = this.data.Bugs.All();
+
+            if (model != null)
+            {
+                bugs = BuildingFilter(model, bugs);
+            }
+
+            var data = bugs.Select(BugViewModel.Create());
+
+            return this.Ok(data);
+        }
+
+        private static IQueryable<Bug> BuildingFilter(FilterBugsBindingModel model, IQueryable<Bug> bugs)
+        {
+            if (model.Keyword != null)
+            {
+                bugs = bugs.Where(b => b.Title.Contains(model.Keyword));
+            }
+
+            if (model.Author != null)
+            {
+                bugs = bugs.Where(b => b.Author.UserName == model.Author);
+            }
+
+            if (model.Statuses != null)
+            {
+                var statuses = model.Statuses.Split('|');
+                var bugStatuses = new List<BugStatus>();
+
+                for (int i = 0; i < statuses.Length; i++)
+                {
+                    BugStatus parsedStatus;
+                    bool isSuccessful = Enum.TryParse(statuses[i], out parsedStatus);
+
+                    if (isSuccessful)
+                    {
+                        bugStatuses.Add(parsedStatus);
+                    }
+                }
+
+                bugs = bugs.Where(b => bugStatuses.Contains(b.Status));
+            }
+            return bugs;
+        }
+
+    public class FilterBugsBindingModel
+    {
+        public string Keyword { get; set; }
+
+        public string Statuses { get; set; }
+
+        public string Author { get; set; }
+    }
+
+    public class BugViewModel
+    {
+        public int Id { get; set; }
+
+        public string Title { get; set; }
+
+        public string Status { get; set; }
+
+        public string Author { get; set; }
+
+        public DateTime DateCreated { get; set; }
+
+        public static Expression<Func<Bug, BugViewModel>> Create()
+        {
+            return b => new BugViewModel()
+            {
+                Id = b.Id,
+                Title = b.Title,
+                Status = b.Status.ToString(),
+                Author = b.Author == null ? null : b.Author.UserName,
+                DateCreated = b.DateCreated
+            };
+        } 
+    }
+}
+
+
+    [RoutePrefix("api")]
+    public class CommentsController : BaseApiController
+    {
+        public CommentsController(IBugsUnitOfWork data)
+            : base(data)
+        {
+        }
+
+        public CommentsController()
+        {
+        }
+
+Problem 10. Returns the list of comments ordered descending by date as JSON array
+
+        // GET api/comments
+        [HttpGet]
+        [Route("comments")]
+        public IHttpActionResult GetAllComments()
+        {
+            var comments = this.data.Comments.All()
+                .OrderByDescending(c => c.DateCreated)
+                .ThenByDescending(c => c.Id)
+                .Select(c => new CommentWithBugViewModel()
+                {
+                    Id = c.Id,
+                    Text = c.Text,
+                    Author = c.Author == null ? null : c.Author.UserName,
+                    DateCreated = c.DateCreated,
+                    BugId = c.BugId,
+                    BugTitle = c.Bug.Title
+                });
+
+            return this.Ok(comments);
+        }
+
+    public class CommentWithBugViewModel
+    {
+        public int Id { get; set; }
+
+        public string Text { get; set; }
+
+        public string Author { get; set; }
+
+        public DateTime DateCreated { get; set; }
+
+        public int BugId { get; set; }
+
+        public string BugTitle { get; set; }
+    }
+
+Problem 11. Returns the list of comments for the specified bug ordered descending by date as JSON array
+
+        //GET /api/bugs/{id}/comments
+        [HttpGet]
+        [Route("bugs/{id}/comments")]
+        public IHttpActionResult GetCommentsForGivenBug(int id)
+        {
+            var bug = this.data.Bugs.Find(id);
+
+            if (bug == null)
+            {
+                return this.NotFound();
+            }
+
+            var comments = bug.Comments
+                .OrderByDescending(c => c.DateCreated)
+                .ThenByDescending(c => c.Id)
+                .Select(c => new CommentViewModel 
+                {
+                    Id =c.Id,
+                    Text = c.Text,
+                    Author = c.Author == null ? null : c.Author.UserName,
+                    DateCreated = c.DateCreated
+                });
+
+            return this.Ok(comments);
+        }
+
+    public class CommentViewModel
+    {
+        public int Id { get; set; }
+
+        public string Text { get; set; }
+
+        public string Author { get; set; }
+
+        public DateTime DateCreated { get; set; }
+    }
+
+Problem 12. Write a REST service to add anonymous comment for specified bug.
+If a valid user's bearer authorization access_token is given in the request headers, 
+the comment author should be the logged-in user. Otherwise, the comment should be anonymous (author is null)
+
+        [HttpPost]
+        [Route("bugs/{id}/comments")]
+        public IHttpActionResult AddNewComment(int id, PostCommentBindingModel model)
+        {
+            if (model == null)
+            {
+                return this.BadRequest("Model is empty");
+            }
+
+            if (!ModelState.IsValid)
+            {
+                return this.BadRequest(this.ModelState);
+            }
+
+            var bug = this.data.Bugs.Find(id);
+
+            if (bug == null)
+            {
+                return this.NotFound();
+            }
+
+            var loggedUserId = this.User.Identity.GetUserId();
+            var user = this.data.Users.Find(loggedUserId);
+
+            var comment = new Comment()
+            {
+                Author = user,
+                DateCreated = DateTime.Now,
+                Text = model.Text
+            };
+
+            bug.Comments.Add(comment); // автоматично EF си сетва, че бъга който намерих по горе има коментар
+            this.data.SaveChanges();
+
+            if (user != null)
+            {
+                return this.Ok(new {Id = bug.Id, Author = user.UserName, Message = "User comment added for bug #" + bug.Id});
+            }
+
+            return this.Ok(new { Id = bug.Id, Message = "Added anonymous comment for bug #" + bug.Id });
+        }
+    }
+
+    public class PostCommentBindingModel
+    {
+        [Required]
+        public string Text { get; set; }
+    }
+
+Problem 13. Write integration tests for the "Get Bug Comments" REST service. Ensure you cover all interesting cases. 
+Put your tests in a new class called "BugCommentsIntegrationTests".
+
+    [TestClass]
+    public class BugCommentsIntegrationTests
+    {
+        [TestMethod]
+        public void GetCommentsForExistingBug_ShouldReturn200Ok_TheBugWithComments()
+        {
+            // Arrange -> create a new bug with two comments
+            TestingEngine.CleanDatabase();
+            var context = new BugTrackerDbContext();
+
+            var bugsToAdds = new BugModel[]
+            {
+                new BugModel() { Title = "First Bug" },
+                new BugModel() { Title = "Second Bug", Description = "More info"},
+                new BugModel() { Title = "Third Bug" }
+            };
+
+            // Act -> submit a few bugs
+            foreach (var bug in bugsToAdds)
+            {
+                var httpPostResponse = TestingEngine.SubmitBugHttpPost(bug.Title, bug.Description);
+                Thread.Sleep(2);
+
+                // Assert -> ensure each bug is successfully submitted
+                Assert.AreEqual(HttpStatusCode.Created, httpPostResponse.StatusCode);
+            }
+            
+            var existingBug = context.Bugs.FirstOrDefault();
+
+            if (existingBug == null)
+            {
+                Assert.Fail("Cannot perform tests - no bugs in DB.");
+            }
+
+            var endpoint = string.Format("api/bugs/{0}/comments", existingBug.Id);
+            
+            var httpResponse = TestingEngine.HttpClient.GetAsync(endpoint).Result;
+
+            Assert.AreEqual(HttpStatusCode.OK, httpResponse.StatusCode);
+
+            var comments = httpResponse.Content.ReadAsAsync<List<CommentViewModel>>().Result;
+
+            foreach (var comment in comments)
+            {
+                Assert.IsNotNull(comment.Text);
+                Assert.AreNotEqual(0, comment.Id);
+            }
+
+        }
+
+        [TestMethod]
+        public void GetCommentsForExistingBug_ShouldReturn404NotFound_NonExistingBug()
+        {
+            // Arrange -> create a new bug with two comments
+            TestingEngine.CleanDatabase();
+            var context = new BugTrackerDbContext();
+
+            var bugsToAdds = new BugModel[]
+            {
+                new BugModel() { Title = "First Bug" },
+                new BugModel() { Title = "Second Bug", Description = "More info"},
+                new BugModel() { Title = "Third Bug" }
+            };
+
+            // Act -> submit a few bugs
+            foreach (var bug in bugsToAdds)
+            {
+                var httpPostResponse = TestingEngine.SubmitBugHttpPost(bug.Title, bug.Description);
+                Thread.Sleep(2);
+
+                // Assert -> ensure each bug is successfully submitted
+                Assert.AreEqual(HttpStatusCode.Created, httpPostResponse.StatusCode);
+            }
+
+            var existingBug = context.Bugs.FirstOrDefault();
+
+            if (existingBug == null)
+            {
+                Assert.Fail("Cannot perform tests - no bugs in DB.");
+            }
+
+            var endpoint = ("api/bugs/-1/comments");
+
+            var httpResponse = TestingEngine.HttpClient.GetAsync(endpoint).Result;
+
+            Assert.AreEqual(HttpStatusCode.NotFound, httpResponse.StatusCode);
+
+        }
+    }
+
+Problem 14.	Repository and Unit of Work
+Before modifying your project first backup your work.
+Implement the classical Repository and Unit of Work patterns to separate the EF data layer from the Web API controllers 
+through interfaces and simplify the eventual unit testing of the Web API controllers.
+
+1. Създавам си папка Repositories в Data Layer и слагам IRepository интерфейс
+
+    public interface IRepository<T>
+    {
+        IQueryable<T> All();
+
+        T Find(object id);
+
+        void Add(T entity);
+
+        void Update(T entity);
+
+        void Remove(T entity);
+
+        T Remove(object id);
+    }
+
+...после си създавам клас GenericRepository който имплементира IRepository
+
+    public class GenericEfRepository<TEntity> : IRepository<TEntity>
+        where TEntity : class
+    {
+        private DbContext dbContext;
+        private IDbSet<TEntity> entitySet;
+
+        public GenericEfRepository(DbContext dbContext)
+        {
+            this.dbContext = dbContext;
+            this.entitySet = dbContext.Set<TEntity>();
+        }
+
+        public IDbSet<TEntity> EntitySet
+        {
+            get { return this.entitySet; }
+        }
+
+        public IQueryable<TEntity> All()
+        {
+            return this.entitySet;
+        }
+
+        public TEntity Find(object id)
+        {
+            return this.entitySet.Find(id);
+        }
+
+        public void Add(TEntity entity)
+        {
+            this.ChangeState(entity, EntityState.Added);
+        }
+
+        public void Update(TEntity entity)
+        {
+            this.ChangeState(entity, EntityState.Modified);
+        }
+
+        public void Remove(TEntity entity)
+        {
+            this.ChangeState(entity, EntityState.Deleted);
+        }
+
+        public TEntity Remove(object id)
+        {
+            var entity = this.Find(id);
+            this.Remove(entity);
+            return entity;
+        }
+
+        private void ChangeState(TEntity entity, EntityState state)
+        {
+            var entry = this.dbContext.Entry(entity);
+            if (entry.State == EntityState.Detached)
+            {
+                this.entitySet.Attach(entity);
+            }
+
+            entry.State = state;
+        }
+    }
+
+2. Създавам си нова папка UnitOfWork в Data Layer и вкарвам IBugsUnitOfWork интерфейс
+
+    public interface IBugsUnitOfWork
+    {
+        IRepository<User> Users { get; }
+
+        IRepository<Bug> Bugs { get; }
+
+        IRepository<Comment> Comments { get; }
+
+        int SaveChanges();
+    }
+
+... после си създавам клас BugsUnitOfWork който имплементира interface IBugUnitOfWork
+
+    public class BugsUnitOfWork : IBugsUnitOfWork
+    {
+        private readonly DbContext dbContext;
+
+        private readonly IDictionary<Type, object> repositories;
+
+        public BugsUnitOfWork()
+            : this(new BugTrackerDbContext())
+        {
+        }
+
+        public BugsUnitOfWork(DbContext dbContext)
+        {
+            this.dbContext = dbContext;
+            this.repositories = new Dictionary<Type, object>();
+        }
+
+        public IRepository<User> Users
+        {
+            get { return this.GetRepository<User>(); }
+        }
+
+        public IRepository<Bug> Bugs
+        {
+            get { return this.GetRepository<Bug>(); }
+        }
+
+        public IRepository<Comment> Comments
+        {
+            get { return this.GetRepository<Comment>(); }
+        }
+
+        public int SaveChanges()
+        {
+            return this.dbContext.SaveChanges();
+        }
+
+        private IRepository<T> GetRepository<T>() where T : class
+        {
+            if (!this.repositories.ContainsKey(typeof(T)))
+            {
+                var type = typeof(GenericEfRepository<T>);
+                this.repositories.Add(typeof(T),
+                    Activator.CreateInstance(type, this.dbContext));
+            }
+
+            return (IRepository<T>)this.repositories[typeof(T)];
+        }
+    }
+
+3. Връщам се в BaseApiController и разкачам базата
+
+        protected IBugsUnitOfWork data;
+
+        public BaseApiController(IBugsUnitOfWork data)
+        {
+            this.data = data;
+        }
+
+        public BaseApiController() 
+            : this (new BugsUnitOfWork())
+        {        
+        }
+
+4. Във всеки един от контолерите добавям следните два конструктора
+
+        public BugsController(IBugsUnitOfWork data)
+            : base(data)
+        {
+        }
+
+        public BugsController()
+        {
+        }
+
+... и също така подменям навсякъде в кода връзката към съществуващата база с мокнатата вече база и добавям метода .All()
+
+Problem 15. Write unit tests with mocking for the "Edit Bug" REST service. 
+Use a fake or mocked repository and unit of work implementations. 
+Test the work of the Web API controller only. Your unit test should not access the database. 
+Ensure you cover all interesting cases. Put your tests in a new class called "EditBugUnitTestsWithMocking".
+
+1. В BugTracker.Tests си създавам папка Mocks. В нея си създавам два класа GenericRepositoryMock и BugsDataMock
+
+    public class BugsDataMock : IBugsUnitOfWork
+    {
+        private GenericRepositoryMock<User> usersMock = new GenericRepositoryMock<User>();
+        private GenericRepositoryMock<Bug> bugsMock = new GenericRepositoryMock<Bug>();
+        private GenericRepositoryMock<Comment> commentsMock = new GenericRepositoryMock<Comment>();
+
+        public bool ChangesSaved { get; set; }
+
+        public IRepository<User> Users
+        {
+            get { return this.usersMock; }
+        }
+
+        public IRepository<Bug> Bugs
+        {
+            get { return this.bugsMock; }
+        }
+
+        public IRepository<Comment> Comments
+        {
+            get { return this.commentsMock; }
+        }
+
+        public void SaveChanges()
+        {
+            this.ChangesSaved = true;
+        }
+    }
+
+    public class GenericRepositoryMock<TEntity> : IRepository<TEntity>
+       where TEntity : class
+    {
+        private List<TEntity> entities = new List<TEntity>();
+
+        private Func<TEntity, object> keySelector;
+
+        public bool ChangesSaved { get; set; }
+
+        public GenericRepositoryMock(Func<TEntity, object> keySelector = null)
+        {
+            if (keySelector != null)
+            {
+                this.keySelector = keySelector;
+            }
+            else
+            {
+                this.keySelector = (u => ((dynamic)u).Id); // за да ползвам dynamic ми трябва референция към Microsoft.CSharp
+            }
+        }
+
+        public IQueryable<TEntity> All()
+        {
+            return this.entities.AsQueryable();
+        }
+
+        public TEntity Find(object id)
+        {
+            return this.entities.FirstOrDefault(entity => id.Equals(this.keySelector(entity)));
+        }
+
+        public void Add(TEntity entity)
+        {
+            this.entities.Add(entity);
+        }
+
+        public void Update(TEntity entity)
+        {
+            var existingEntity = this.Find(this.keySelector(entity));
+            var existingEntityIndex = this.entities.IndexOf(existingEntity);
+            this.entities[existingEntityIndex] = entity;
+        }
+
+        public void Remove(TEntity entity)
+        {
+            var existingEntity = this.Find(this.keySelector(entity));
+            var existingEntityIndex = this.entities.IndexOf(existingEntity);
+            this.entities.RemoveAt(existingEntityIndex);
+        }
+
+        public TEntity Remove(object id)
+        {
+            var entity = this.Find(id);
+            this.Remove(entity);
+            return entity;
+        }
+
+        public void SaveChanges()
+        {
+            this.ChangesSaved = true;
+        }
+    }
+
+2. В папка UnitTests си създавам тестовият клас EditBugUnitTestsWithMocking
+
+    [TestClass]
+    public class EditBugUnitTestsWithMocking
+    {
+        [TestMethod]
+        public void EditingExistingBug_ShouldChangeOnlySentData()
+        {
+            //IBugsUnitOfWork mockedUnitOfWork = new BugsDataMock();
+
+            //var bugsMock = mockedUnitOfWork.Bugs;
+
+            //var fakeBugs = new List<Bug>()
+            //    {
+            //        //Arrange
+            //        new Bug()
+            //        {
+            //            Id = 1,
+            //            Title = "Bug #1",
+            //            Description = "Bug Description",
+            //            DateCreated = DateTime.Now.AddDays(-1)
+            //        },
+            //        new Bug()
+            //        {
+            //            Id = 2,
+            //            Title = "Bug #2",
+            //            Description = "Bug Description #2",
+            //            DateCreated = DateTime.Now.AddDays(-5)
+            //        }
+            //    };
+
+            //foreach (var bug in fakeBugs)
+            //{
+            //    bugsMock.Add(bug);
+            //}
+
+            //var newTitle = "Changed " + DateTime.Now.Ticks;
+
+            //var model = new EditBugBindingModel()
+            //{
+            //    Title = newTitle
+            //};
+
+            //var oldDescription = fakeBugs[0].Description;
+            //var oldStatus = fakeBugs[0].Status;
+
+            //var bugsController = new BugsController(mockedUnitOfWork);
+            //this.SetupControllerForTesting(bugsController, "bugs");
+            //var response = bugsController.PatchBug(1, model).ExecuteAsync(CancellationToken.None).Result;
+
+            //Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+            //Assert.AreEqual(oldDescription, fakeBugs[0].Description);
+            //Assert.AreEqual(oldStatus, fakeBugs[0].Status);
+            //Assert.AreEqual(newTitle, fakeBugs[0].Title);
+
+... същото може да се направи и с помощта на Moq FrameWork
+
+            var fakeBugs = new List<Bug>()
+                {
+                    //Arrange
+                    new Bug()
+                    {
+                        Id = 1,
+                        Title = "Bug #1",
+                        Description = "Bug Description",
+                        DateCreated = DateTime.Now.AddDays(-1)
+                    },
+                    new Bug()
+                    {
+                        Id = 2,
+                        Title = "Bug #2",
+                        Description = "Bug Description #2",
+                        DateCreated = DateTime.Now.AddDays(-5)
+                    }
+                };
+
+            var mockRepository = new Mock<IRepository<Bug>>();
+            mockRepository
+                .Setup(r => r.Find(It.IsAny<int>()))
+                .Returns((int id) =>
+                {
+                    return fakeBugs.FirstOrDefault(f => f.Id == id);
+                });
+
+            var mockUnitOfWork = new Mock<IBugsUnitOfWork>();
+            mockUnitOfWork.Setup(u => u.Bugs).Returns(mockRepository.Object);
+
+            var newTitle = "Changed " + DateTime.Now.Ticks;
+
+            var model = new EditBugBindingModel()
+            {
+                Title = newTitle
+            };
+
+            var oldDescription = fakeBugs[0].Description;
+            var oldStatus = fakeBugs[0].Status;
+
+            //Act
+
+            var controller = new BugsController(mockUnitOfWork.Object);
+            SetupController(controller);
+
+            var response = controller.PatchBug(1, model).ExecuteAsync(CancellationToken.None).Result;
+
+            //Assert
+
+            Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+            mockUnitOfWork.Verify(c => c.SaveChanges(), Times.Once);
+            Assert.AreEqual(oldDescription, fakeBugs[0].Description);
+            Assert.AreEqual(oldStatus, fakeBugs[0].Status);
+            Assert.AreEqual(newTitle, fakeBugs[0].Title);
+        }
+
+        private void SetupController(ApiController controller)
+        {
+            controller.Request = new HttpRequestMessage();
+            controller.Configuration = new HttpConfiguration();
+        }
+...............................................................................................................
+Ето как се създава TestingEngine. За да го вдигна трябва да инсталирам Owin.Testing и OwinSelfHost
+
+    [TestClass]
+    public static class TestingEngine
+    {
+        private static TestServer TestWebServer { get; set; }
+
+        public static HttpClient HttpClient { get; private set; }
+
+        [AssemblyInitialize]
+        public static void AssemblyInit(TestContext context)
+        {
+            // Start OWIN testing HTTP server with Web API support
+            TestWebServer = TestServer.Create(appBuilder =>
+            {
+                var config = new HttpConfiguration();
+                WebApiConfig.Register(config);
+                var webAppStartup = new Startup();
+                webAppStartup.Configuration(appBuilder);
+                appBuilder.UseWebApi(config);
+            });
+            HttpClient = TestWebServer.HttpClient;
+        }
+
+        [AssemblyCleanup]
+        public static void AssemblyCleanup()
+        {
+            // Stop the OWIN testing HTTP server
+            if (TestWebServer != null)
+            {
+                TestWebServer.Dispose();
+            }
+        }
+
+        public static void CleanDatabase()
+        {
+            using (var dbContext = new BidSystemDbContext())
+            {
+                dbContext.Bids.Delete();
+                dbContext.Offers.Delete();
+                dbContext.Users.Delete();
+                dbContext.SaveChanges();
+            }
+        }

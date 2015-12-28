@@ -1,0 +1,385 @@
+[RoutePrefix("api/offers")]
+    public class OffersController : BaseApiController
+    {
+
+Problem 2. Returns the list of offers ordered by publish date from the latest to the earliest as JSON array. 
+Each offer holds Id, Title, Description, Seller (username), DatePublished, InitialPrice, ExpirationDateTime, 
+IsExpired, BidsCount and BidWinner. All dates are displayed in ISO 8601 format. An offer is expired if its expiration date
+has passed. If the offer is expired and when it has at least one bid, it has a bid winner – 
+the username that has the maximum offers price (the biggest bid).
+
+        // GET: api/Offers/all
+        [Route("all")]
+        public IHttpActionResult GetOffers()
+        {
+            var offers = this.Data.Offers
+                .OrderByDescending(o => o.DatePublished)
+                .Select(OfferViewModel.Create);
+
+            return this.Ok(offers);
+        }
+
+    public class OfferViewModel
+    {
+        public int Id { get; set; }
+
+        public string Title { get; set; }
+
+        public string Description { get; set; }
+
+        public string Seller { get; set; }
+
+        public DateTime DatePublished { get; set; }
+
+        public decimal InitialPrice { get; set; }
+
+        public DateTime ExpirationDateTime { get; set; }
+
+        public bool IsExpired { get; set; }
+
+        public int BidsCount { get; set; }
+
+        public string BidWinner { get; set; }
+
+        public static Expression<Func<Offer, OfferViewModel>> Create
+        {
+            get
+            {
+                return o => new OfferViewModel
+                {
+                    Id = o.Id,
+                    Title = o.Title,
+                    Description = o.Description,
+                    Seller = o.Seller == null ? null : o.Seller.UserName,
+                    DatePublished = o.DatePublished,
+                    InitialPrice = o.InitialPrice,
+                    ExpirationDateTime = o.ExpirationDateTime,
+                    IsExpired = o.ExpirationDateTime <= DateTime.Now,
+                    BidsCount = o.Bids.Count,
+                    BidWinner = o.ExpirationDateTime <= DateTime.Now && o.Bids.Count > 0
+                        ? o.Bids.OrderByDescending(b => b.OfferedPrice).FirstOrDefault().Bidder.UserName
+                        : null
+                };
+            }          
+        } 
+    }
+
+Problem 3. Returns the list of active offers ordered by expiration date from the earliest to the latest as JSON array. 
+
+        // GET: api/Offers/active
+        [Route("active")]
+        public IHttpActionResult GetActiveOffers()
+        {
+            var offers = this.Data.Offers
+                .Where(o => o.ExpirationDateTime > DateTime.Now)
+                .OrderBy(o => o.ExpirationDateTime)
+                .Select(OfferViewModel.Create);
+
+            return this.Ok(offers);
+        }
+
+Problem 4. Returns the list of expired offers ordered by expiration date from the earliest to the latest as JSON array.
+
+        // GET: api/Offers/expired
+        [Route("expired")]
+        public IHttpActionResult GetExpiredOffers()
+        {
+            var offers = this.Data.Offers
+                .Where(o => o.ExpirationDateTime <= DateTime.Now)
+                .OrderBy(o => o.ExpirationDateTime)
+                .Select(OfferViewModel.Create);
+
+            return this.Ok(offers);
+        }
+
+Problem 5. Returned when the requested offer exists.
+Returns the offer details as JSON array. It holds Id, Title, Description, Seller (username), DatePublished, 
+InitialPrice, ExpirationDateTime, IsExpired, BidWinner and Bids. Dates are displayed in ISO 8601 format.
+Bids are displayed as JSON array. Each bid holds Id, OfferId, DateCreated, Bidder (username), OfferedPrice and Comment.
+Sort the bids from the latest to the earliest. If bids do not exist, return them as empty array: [].
+
+        // GET /api/offers/details/{id}
+        [ResponseType(typeof(Offer))]
+        [Route("details/{id}")]
+        public IHttpActionResult GetOffer(int id)
+        {
+            var offer = this.Data.Offers
+                .Where(o => o.Id == id)
+                .Select(o => new
+                {
+                    Id = o.Id,
+                    Title = o.Title,
+                    Description = o.Description,
+                    Seller = o.Seller == null ? null : o.Seller.UserName,
+                    DatePublished = o.DatePublished,
+                    InitialPrice = o.InitialPrice,
+                    ExpirationDateTime = o.ExpirationDateTime,
+                    IsExpired = o.ExpirationDateTime <= DateTime.Now,
+                    BidWinner = o.ExpirationDateTime <= DateTime.Now && o.Bids.Count > 0
+                        ? o.Bids.OrderByDescending(b => b.OfferedPrice).FirstOrDefault().Bidder.UserName
+                        : null,
+                    Bids = o.Bids
+                       .OrderByDescending(b => b.Id)
+                       .Select(b => new
+                    {
+                        b.Id,
+                        b.OfferId,
+                        b.DateCreated,
+                        b.Bidder.UserName,
+                        b.OfferedPrice,
+                        b.Comment
+                    })
+
+                })
+                .FirstOrDefault();
+
+            if (offer == null)
+            {
+                return NotFound();
+            }
+
+            return Ok(offer);
+        }
+
+Problem 8. Returns the list of user's offers ordered by publish date from the earliest to the latest as JSON array. 
+Each offer holds Id, Title, Description, Seller (username), DatePublished, InitialPrice, ExpirationDateTime, 
+IsExpired, BidsCount and BidWinner. All dates are displayed in ISO 8601 format.
+
+        // GET: /api/offers/my
+        [Route("my")]
+        [HttpGet]
+        public IHttpActionResult ListUserOffers()
+        {
+            var currentUserId = this.User.Identity.GetUserId();
+            var user = this.Data.Users.FirstOrDefault(u => u.Id == currentUserId);
+
+            if (user == null)
+            {
+                return this.Unauthorized();
+            }
+
+            var offers = this.Data.Offers
+                .Where(o => o.SellerId == user.Id)
+                .OrderBy(o => o.DatePublished)
+                .Select(OfferViewModel.Create);
+
+            return this.Ok(offers);
+        }
+
+Problem 9. On success, when user's offer is added, the service returns 201 (Created) + a header "Location" holding 
+the URL of the created offer + the offer Id + the Seller username + human readable message as JSON object 
+in the response body.
+
+        // POST: api/Offers
+        [ResponseType(typeof(Offer))]
+        public IHttpActionResult PostOffer(OfferBindingModel model)
+        {
+            if (model == null)
+            {
+                return this.BadRequest("Offer cannot be empty.");
+            }
+
+            if (!ModelState.IsValid)
+            {
+                return this.BadRequest(this.ModelState);
+            }
+
+            var currentUserId = this.User.Identity.GetUserId();
+            var user = this.Data.Users.FirstOrDefault(u => u.Id == currentUserId);
+
+            if (user == null)
+            {
+                return this.Unauthorized();
+            }
+            
+            var offer = new Offer()
+            {
+                Title = model.Title,
+                Description = model.Description,
+                ExpirationDateTime = model.ExpirationDateTime,
+                InitialPrice = model.InitialPrice,
+                SellerId = currentUserId,
+                DatePublished = DateTime.Now
+            };
+
+            this.Data.Offers.Add(offer);
+            this.Data.SaveChanges();
+
+            return CreatedAtRoute("DefaultApi", new { id = offer.Id }, new { Id = offer.Id, Seller = this.User.Identity.GetUserName(), Message = "Offer created." });
+        }
+
+    public class OfferBindingModel
+    {
+        [Required]
+        public string Title { get; set; }
+
+        public string Description { get; set; }
+
+        public decimal InitialPrice { get; set; }
+
+        public DateTime ExpirationDateTime { get; set; }
+    }
+
+Problem 12. Write a REST service to bid for existing offer. The offer ID is given in the request URI.
+The bid price and comment (optional) are posted in the HTTP body as form data (URL-encoded).
+
+        // POST: /api/offers/117/bid
+        [Route("{id}/bid")]
+        [HttpPost]
+        public IHttpActionResult BidForExistingOffer(int id, BidBindingModel model)
+        {
+            if (model == null)
+            {
+                return this.BadRequest("Bid cannot be empty.");
+            }
+
+            if (!ModelState.IsValid)
+            {
+                return this.BadRequest(this.ModelState);
+            }
+
+            var currentUserId = this.User.Identity.GetUserId();
+            var user = this.Data.Users.FirstOrDefault(u => u.Id == currentUserId);
+            //var user = this.Data.UserStore.FindByIdAsync(currentUserId).Result;
+
+            if (user == null)
+            {
+                return this.Unauthorized();
+            }
+
+            var offer = this.Data.Offers
+                .Where(o => o.Id == id)
+                .Select(o => new
+                {
+                    Id = o.Id,
+                    InitialPrice = o.InitialPrice,
+                    ExpirationDateTime = o.ExpirationDateTime,
+                    Bids = o.Bids.Select(b => b.OfferedPrice)
+                })
+                .FirstOrDefault();
+
+            if (offer == null)
+            {
+                return NotFound();
+            }
+
+            if (offer.ExpirationDateTime < DateTime.Now)
+            {
+                return this.BadRequest("Offer has expired.");
+            }
+
+            var maxBidPrice = offer.InitialPrice;
+            if (offer.Bids.Any())
+            {
+                maxBidPrice = offer.Bids.Max();
+            }
+
+            if (model.BidPrice <= maxBidPrice)
+            {
+                return this.BadRequest("Your bid should be > " + maxBidPrice);
+            }
+
+            var bid = new Bid
+            {
+                OfferedPrice = model.BidPrice,
+                Comment = model.Comment,
+                DateCreated = DateTime.Now,
+                OfferId = id,
+                BidderId = currentUserId
+            };
+
+            this.Data.Bids.Add(bid);
+            this.Data.SaveChanges();
+
+            return this.Ok(
+                new { bid.Id, Bidder = user.UserName, Message = "Bid created." });
+        }
+
+    public class BidBindingModel
+    {
+        [Required]
+        public decimal BidPrice { get; set; }
+
+        public string Comment { get; set; }
+    }
+}
+
+    [RoutePrefix("api/bids")]
+    public class BidsController : BaseApiController
+    {
+
+Problem 10. Returns the list of user's bids ordered by date from the latest to the earliest as JSON array.
+Each bid holds Id, OfferId, DateCreated (in ISO 8601 format), Bidder (username), OfferedPrice and Comment.
+
+        // GET: /api/bids/my
+        [Route("my")]
+        [HttpGet]
+        public IHttpActionResult ListUserBids()
+        {
+            var currentUserId = this.User.Identity.GetUserId();
+            var user = this.Data.Users.FirstOrDefault(u => u.Id == currentUserId);
+
+            if (user == null)
+            {
+                return this.Unauthorized();
+            }
+
+            var bids = this.Data.Bids
+                .Where(b => b.BidderId == user.Id)
+                .OrderByDescending(b => b.DateCreated)
+                .Select(BidViewModel.Create());
+
+            return this.Ok(bids);
+        }
+
+    public class BidViewModel
+    {
+        public int Id { get; set; }
+
+        public int OfferId { get; set; }
+
+        public DateTime DateCreated { get; set; }
+
+        public string Bidder { get; set; }
+
+        public decimal OfferedPrice { get; set; }
+
+        public string Comment { get; set; }
+
+        public static Expression<Func<Bid, BidViewModel>> Create()
+        {
+            return b => new BidViewModel
+            {
+                Id = b.Id,
+                OfferId = b.OfferId,
+                DateCreated = b.DateCreated,
+                Bidder = b.Bidder.UserName,
+                OfferedPrice = b.OfferedPrice,
+                Comment = b.Comment
+            };
+        }
+
+Problem 11. Write a REST service to list user's won bids. A bid is won when it has offered the highest price 
+for its offer and its offer has expired.  
+
+        // GET: /api/bids/won
+        [Route("won")]
+        [HttpGet]
+        public IHttpActionResult ListUserWonBids()
+        {
+            var currentUserId = this.User.Identity.GetUserId();
+            var user = this.Data.Users.FirstOrDefault(u => u.Id == currentUserId);
+
+            if (user == null)
+            {
+                return this.Unauthorized();
+            }
+
+            var bids = this.Data.Bids
+                .Where(b => b.BidderId == user.Id && b.Offer.InitialPrice < b.OfferedPrice && b.Offer.ExpirationDateTime <= DateTime.Now)
+                .OrderBy(b => b.DateCreated)
+                .Select(BidViewModel.Create());
+
+            return this.Ok(bids);
+        }
+    }

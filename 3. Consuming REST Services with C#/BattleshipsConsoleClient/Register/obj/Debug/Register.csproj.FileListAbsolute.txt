@@ -1,0 +1,11 @@
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\3.Consuming REST Services with C#\BattleshipsConsoleClient\Register\bin\Debug\Register.exe.config
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\3.Consuming REST Services with C#\BattleshipsConsoleClient\Register\obj\Debug\Register.csproj.App.config
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\3.Consuming REST Services with C#\BattleshipsConsoleClient\Register\obj\Debug\Register.csprojResolveAssemblyReference.cache
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\3.Consuming REST Services with C#\BattleshipsConsoleClient\Register\bin\Debug\Register.exe
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\3.Consuming REST Services with C#\BattleshipsConsoleClient\Register\bin\Debug\Register.pdb
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\3.Consuming REST Services with C#\BattleshipsConsoleClient\Register\bin\Debug\System.Net.Http.Extensions.dll
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\3.Consuming REST Services with C#\BattleshipsConsoleClient\Register\bin\Debug\System.Net.Http.Primitives.dll
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\3.Consuming REST Services with C#\BattleshipsConsoleClient\Register\bin\Debug\System.Net.Http.Extensions.xml
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\3.Consuming REST Services with C#\BattleshipsConsoleClient\Register\bin\Debug\System.Net.Http.Primitives.xml
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\3.Consuming REST Services with C#\BattleshipsConsoleClient\Register\obj\Debug\Register.exe
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\3.Consuming REST Services with C#\BattleshipsConsoleClient\Register\obj\Debug\Register.pdb

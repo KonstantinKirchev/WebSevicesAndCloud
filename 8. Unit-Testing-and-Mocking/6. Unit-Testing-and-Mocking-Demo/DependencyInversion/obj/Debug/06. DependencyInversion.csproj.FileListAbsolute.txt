@@ -1,0 +1,8 @@
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\8.Компонентно тестване и mocking\6. Unit-Testing-and-Mocking-Demo\DependencyInversion\bin\Debug\DependencyInversion.exe.config
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\8.Компонентно тестване и mocking\6. Unit-Testing-and-Mocking-Demo\DependencyInversion\bin\Debug\DependencyInversion.exe
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\8.Компонентно тестване и mocking\6. Unit-Testing-and-Mocking-Demo\DependencyInversion\bin\Debug\DependencyInversion.pdb
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\8.Компонентно тестване и mocking\6. Unit-Testing-and-Mocking-Demo\DependencyInversion\bin\Debug\Ninject.dll
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\8.Компонентно тестване и mocking\6. Unit-Testing-and-Mocking-Demo\DependencyInversion\bin\Debug\Ninject.xml
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\8.Компонентно тестване и mocking\6. Unit-Testing-and-Mocking-Demo\DependencyInversion\obj\Debug\06. DependencyInversion.csprojResolveAssemblyReference.cache
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\8.Компонентно тестване и mocking\6. Unit-Testing-and-Mocking-Demo\DependencyInversion\obj\Debug\DependencyInversion.exe
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\8.Компонентно тестване и mocking\6. Unit-Testing-and-Mocking-Demo\DependencyInversion\obj\Debug\DependencyInversion.pdb

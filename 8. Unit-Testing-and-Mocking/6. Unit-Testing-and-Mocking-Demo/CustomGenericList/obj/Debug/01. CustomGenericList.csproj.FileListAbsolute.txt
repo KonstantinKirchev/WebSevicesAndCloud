@@ -1,0 +1,6 @@
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\8.Компонентно тестване и mocking\6. Unit-Testing-and-Mocking-Demo\CustomGenericList\bin\Debug\CustomGenericList.exe.config
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\8.Компонентно тестване и mocking\6. Unit-Testing-and-Mocking-Demo\CustomGenericList\bin\Debug\CustomGenericList.exe
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\8.Компонентно тестване и mocking\6. Unit-Testing-and-Mocking-Demo\CustomGenericList\bin\Debug\CustomGenericList.pdb
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\8.Компонентно тестване и mocking\6. Unit-Testing-and-Mocking-Demo\CustomGenericList\obj\Debug\01. CustomGenericList.csprojResolveAssemblyReference.cache
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\8.Компонентно тестване и mocking\6. Unit-Testing-and-Mocking-Demo\CustomGenericList\obj\Debug\CustomGenericList.exe
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\8.Компонентно тестване и mocking\6. Unit-Testing-and-Mocking-Demo\CustomGenericList\obj\Debug\CustomGenericList.pdb

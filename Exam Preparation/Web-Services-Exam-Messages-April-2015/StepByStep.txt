@@ -1,0 +1,737 @@
+GET /api/channels
+
+public IHttpActionResult GetChannels()
+        {
+            var channels = data.Channels.All()
+                .OrderBy(c => c.Name)
+                .Select(c => new ChannelsViewModel
+                {
+                    Id = c.Id,
+                    Name = c.Name
+                });
+            
+            return this.Ok(channels);
+        }
+
+public class ChannelsViewModel
+    {
+        public int Id { get; set; }
+
+        public string Name { get; set; }
+    }
+..........................................................................................................
+// GET: api/Channels/5
+
+        [ResponseType(typeof(ChannelsViewModel))]
+        public IHttpActionResult GetChannel(int id)
+        {
+            var channel = data.Channels
+                .Where(c => c.Id == id)
+                .Select(c=>new ChannelsViewModel()
+                {
+                    Id = c.Id,
+                    Name = c.Name
+                })
+                .FirstOrDefault();
+
+            if (channel == null)
+            {
+                return NotFound();
+            }
+
+            return this.Ok(channel);
+        }
+..........................................................................................................
+// PUT: api/Channels/5
+
+        [ResponseType(typeof(void))]
+        public IHttpActionResult PutChannel(int id, ChannelBindingModel  channelData)
+        {
+            if (channelData == null)
+            {
+                return this.BadRequest("ChannelName cannot be empty.");
+            }
+
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            var channel = data.Channels.Find(id);
+
+            if (channel == null)
+            {
+                return this.NotFound();
+            }
+
+            var duplicatedChannel = data.Channels.Any(c => c.Name == channelData.Name && c.Id != channel.Id);
+
+            if (duplicatedChannel)
+            {
+                return this.Conflict();
+            }
+
+            channel.Name = channelData.Name;
+            data.SaveChanges();
+
+            return this.Ok(new
+            {
+                Message = "Channel #" + channel.Id + " edited successfully."
+            });
+        }
+
+public class ChannelBindingModel
+    {
+        [Required]
+        [StringLength(200, MinimumLength = 1, ErrorMessage = "Channel name should be in range [{1}...{2}]")]
+        public string Name { get; set; }
+    }
+..................................................................................................................
+// POST: api/Channels
+
+        [ResponseType(typeof(ChannelsViewModel))]
+        public IHttpActionResult PostChannel(ChannelBindingModel channelData)
+        {
+            if (channelData == null)
+            {
+                return this.BadRequest("Channel name cannot be empty.");
+            }
+
+            if (!ModelState.IsValid)
+            {
+                return this.BadRequest(this.ModelState);
+            }
+
+            if (data.Channels.Any(c => c.Name == channelData.Name))
+            {
+                return this.Conflict();
+            }
+            
+            var channel = new Channel()
+            {
+                Name = channelData.Name
+            };
+
+            data.Channels.Add(channel);
+            data.SaveChanges();
+
+            return CreatedAtRoute("DefaultApi", new { id = channel.Id}, new ChannelsViewModel{Id = channel.Id, Name = channel.Name});
+        }
+........................................................................................................................
+// DELETE: api/Channels/5
+
+        [ResponseType(typeof(ChannelsViewModel))]
+        public IHttpActionResult DeleteChannel(int id)
+        {
+            var channel = data.Channels.Find(id);
+            
+            if (channel == null)
+            {
+                return NotFound();
+            }
+
+            if (channel.ChannelMessages.Any())
+            {
+                return ResponseMessage(Request.CreateResponse(HttpStatusCode.Conflict,
+                    new { Message = "Cannot delete channel #" + channel.Id + " because it is not empty." }));
+            }
+
+            data.Channels.Remove(channel);
+            data.SaveChanges();
+
+            return Ok(new {Message = "Channel #" + channel.Id + " deleted."});
+        }
+.....................................................................................................................
+// GET api/channel-messages/{channelName}
+
+        [Route("{channelName}")]
+        public IHttpActionResult GetChannelMessages(string channelName, [FromUri]string limit = null)
+        {
+            var channel = data.Channels.FirstOrDefault(c => c.Name == channelName);
+
+            if (channel == null)
+            {
+                return NotFound();
+            }
+
+            var channelMessages = channel.ChannelMessages
+                .OrderByDescending(m => m.DateSent)
+                .ThenByDescending(m => m.Id)
+                .Select(m => new ChannelMessageViewModel
+                {
+                    Id = m.Id,
+                    Text = m.Text,
+                    DateSent = m.DateSent,
+                    Sender = m.Sender != null ? m.Sender.UserName : null
+                });
+
+            if (limit != null)
+            {
+                var maxCount = 0;
+                int.TryParse(limit, out maxCount);
+                if (maxCount < 1 || maxCount > 1000)
+                {
+                    return this.BadRequest("Limit is out of range [1...1000].");
+                }
+                channelMessages = channelMessages.Take(maxCount);
+            }
+
+            return Ok(channelMessages);
+        }
+
+public class BaseViewModel
+    {
+        public int Id { get; set; }
+
+        public string Text { get; set; }
+
+        public DateTime DateSent { get; set; }
+
+        public string Sender { get; set; }
+    }
+....................................................................................................................
+// POST api/channel-messages/{channelName}
+
+        [Route("{channelName}")]
+        public IHttpActionResult PostChannelMessages(string channelName, MessageBindingModel model)
+        {
+            if (model == null)
+            {
+                return this.BadRequest();
+            }
+
+            if (!ModelState.IsValid)
+            {
+                return this.BadRequest(this.ModelState);
+            }
+
+            var channel = data.Channels.All().FirstOrDefault(c => c.Name == channelName);
+
+            if (channel == null)
+            {
+                return this.NotFound();
+            }
+
+            var currentUserId = User.Identity.GetUserId();
+
+            var message = new ChannelMessage
+            {
+                Text = model.Text,
+                DateSent = DateTime.Now,
+                ChannelId = channel.Id,
+                SenderId = currentUserId
+            };
+
+            data.ChannelMessages.Add(message);
+            data.SaveChanges();
+
+            if (currentUserId != null)
+            {
+                return Ok(new MessageViewModel()
+                {
+                    Id = message.Id,
+                    Sender = User.Identity.GetUserName(),
+                    Message = "Message sent to channel " + channel.Name + "."
+                });
+            }
+
+            return Ok(new 
+            {
+                message.Id,
+                Message = "Anonimous message sent to channel " + channel.Name + "."
+            });
+        }
+
+public class MessageBindingModel
+    {
+        [Required]
+        public string Text { get; set; }
+    }
+
+public class MessageViewModel
+    {
+        public int Id { get; set; }
+
+        public string Sender { get; set; }
+
+        public string Message { get; set; }
+    }
+...................................................................................................................
+// GET api/user/personal-messages
+
+        [Authorize]
+        [Route("api/user/personal-messages")]
+        public IHttpActionResult GetPersonalMessages()
+        {
+            var currentUserId = User.Identity.GetUserId();
+
+            if (currentUserId == null)
+            {
+                return this.Unauthorized();
+            }
+
+            var user = db.Users.Find(currentUserId);
+
+            if (user == null)
+            {
+                return this.Unauthorized();
+            }
+
+            var userMessages = db.UserMessages
+                .Where(m => m.RecipientId == currentUserId)
+                .OrderByDescending(m => m.DateSent)
+                .ThenByDescending(m => m.Id)
+                .Select(m => new UserMessageViewModel
+                {
+                    Id = m.Id,
+                    Text = m.Text,
+                    DateSent = m.DateSent,
+                    Sender = m.Sender != null ? m.Sender.UserName : null
+                });
+
+            return Ok(userMessages);
+        }
+
+ public class BaseViewModel
+    {
+        public int Id { get; set; }
+
+        public string Text { get; set; }
+
+        public DateTime DateSent { get; set; }
+
+        public string Sender { get; set; }
+    }
+
+...............................................................................................................
+// POST api/user/personal-messages
+
+        [Route("api/user/personal-messages")]
+        public IHttpActionResult PostPersonalMessages([FromBody] UserMessageBindingModel model)
+        {
+            if (model == null)
+            {
+                return this.BadRequest();
+            }
+
+            if (!ModelState.IsValid)
+            {
+                return this.BadRequest(this.ModelState);
+            }
+
+            var recipient = db.Users.FirstOrDefault(u => u.UserName == model.Recipient);
+
+            if (recipient == null)
+            {
+                return this.NotFound();
+            }
+
+            var userId = User.Identity.GetUserId();
+            User user = null;
+            
+            if (userId != null)
+            {
+                user = db.Users.FirstOrDefault(u => u.Id == userId);
+            }
+
+            if (userId != null && user == null)
+            {
+                return this.Unauthorized();
+            }
+
+            var userMessage = new UserMessage()
+            {
+                Text = model.Text,
+                DateSent = DateTime.Now,
+                RecipientId = recipient.Id,
+                SenderId = userId
+            };
+
+            db.UserMessages.Add(userMessage);
+            db.SaveChanges();
+
+            if (user != null)
+            {
+                return this.Ok(new
+                {
+                    Id = userMessage.Id,
+                    Sender = user.UserName,
+                    Message = "Message sent to user " + recipient.UserName + "."
+                });
+            }
+            return this.Ok(new
+            {
+                Id = userMessage.Id,
+                Message = "Anonymous message sent successfully to user " + recipient.UserName + "."
+            });
+        }
+
+public class UserMessageBindingModel
+    {
+        [Required]
+        public string Text { get; set; }
+
+        [Required]
+        public string Recipient { get; set; }
+    }
+.....................................................................................................................
+
+Problem 16.	Write Integration Tests for "Delete Channel" Service
+                Write integration tests for the "Delete Channel" REST service. 
+                Ensure you cover all interesting cases. Put your tests in a new class called "ChannelIntegrationTests".
+
+[TestClass]
+    public class ChannelIntegrationTests
+    {
+        private MessagesDbContext db = new MessagesDbContext();
+
+        [TestMethod]
+        public void DeleteChannel_NonExisting_ShouldReturn_404NotFound()
+        {
+            TestingEngine.CleanDatabase();
+
+            var channelIdNonExisting = 7;
+
+            // Act -> delete the channel
+            var httpDeleteResponse = TestingEngine.HttpClient.DeleteAsync(
+                "/api/channels/" + channelIdNonExisting).Result;
+
+            // Assert -> HTTP status code is 404 Not Found
+            Assert.AreEqual(HttpStatusCode.NotFound, httpDeleteResponse.StatusCode);
+            Assert.AreEqual(0, TestingEngine.GetChannelsCountFromDb());
+        }
+
+        [TestMethod]
+        public void DeleteChannel_ExistingChannel_ShouldReturn_200OK()
+        {
+            //Arrange
+            TestingEngine.CleanDatabase();
+
+            var channel = new Channel(){Name = "nov kanal"};
+           
+            db.Channels.Add(channel);
+            db.SaveChanges();
+
+            // Act -> delete the channel
+            var httpDeleteResponse = TestingEngine.HttpClient.DeleteAsync(
+                "/api/channels/" + channel.Id).Result;
+
+            // Assert -> HTTP status code is 200 OK
+            Assert.AreEqual(HttpStatusCode.OK, httpDeleteResponse.StatusCode);
+            
+            var response = httpDeleteResponse.Content.ReadAsAsync<Dictionary<string, string>>().Result;
+            
+            Assert.IsNotNull(response["Message"]);
+            Assert.AreEqual(0, db.Channels.Count());
+        }
+
+        [TestMethod]
+        public void DeleteChannel_ExistingChannelNotEmpty_ShouldReturn_409Conflict()
+        {
+            //Arrange
+            TestingEngine.CleanDatabase();
+
+            var channel = new Channel() { Name = "nov kanal" };
+       
+            channel.ChannelMessages.Add(new ChannelMessage()
+            {
+                Id = 1233,
+                Sender = null,
+                DateSent = DateTime.Now,
+                Text = "Hello Dido"
+            });
+
+            db.Channels.Add(channel);
+            db.SaveChanges();
+
+            // Act -> delete the channel
+            var httpDeleteResponse = TestingEngine.HttpClient.DeleteAsync(
+                "/api/channels/" + channel.Id).Result;
+
+            // Assert -> HTTP status code is 409 Conflict
+            Assert.AreEqual(HttpStatusCode.Conflict, httpDeleteResponse.StatusCode);
+      
+            Assert.AreEqual(1, db.Channels.Count());
+        }
+    }
+...................................................................................................................
+Problem 17.	Repository and Unit of Work
+Before you modifying your project first backup your work.
+Implement the classical Repository and Unit of Work patterns to separate the EF data layer
+from the Web API controllers through interfaces and simplify the eventual unit testing of the Web API
+controllers. Use your new data layer in the Web API controllers instead of directly calling Entity Framework.
+
+1. Правя си папка Repositories и си създавам interface IRepository
+
+public interface IRepository<T>
+    {
+        IQueryable<T> All();
+
+        T Find(object id);
+
+        void Add(T entity);
+
+        void Update(T entity);
+
+        void Remove(T entity);
+
+        T Remove(object id);
+    }
+2. В същата папка си създавам клас GenericEfRepository който имплементира IRepository
+
+public class GenericEfRepository<TEntity> : IRepository<TEntity> 
+        where TEntity : class
+    {
+        private DbContext dbContext;
+        private IDbSet<TEntity> entitySet;
+
+        public GenericEfRepository(DbContext dbContext)
+        {
+            this.dbContext = dbContext;
+            this.entitySet = dbContext.Set<TEntity>();
+        }
+
+        public IDbSet<TEntity> EntitySet
+        {
+            get { return this.entitySet; }
+        }
+
+        public IQueryable<TEntity> All()
+        {
+            return this.entitySet;
+        }
+
+        public TEntity Find(object id)
+        {
+            return this.entitySet.Find(id);
+        }
+
+        public void Add(TEntity entity)
+        {
+            this.ChangeState(entity, EntityState.Added);
+        }
+
+        public void Update(TEntity entity)
+        {
+            this.ChangeState(entity, EntityState.Modified);
+        }
+
+        public void Remove(TEntity entity)
+        {
+            this.ChangeState(entity, EntityState.Deleted);
+        }
+
+        public TEntity Remove(object id)
+        {
+            var entity = this.Find(id);
+            this.Remove(entity);
+            return entity;
+        }
+
+        private void ChangeState(TEntity entity, EntityState state)
+        {
+            var entry = this.dbContext.Entry(entity);
+            if (entry.State == EntityState.Detached)
+            {
+                this.entitySet.Attach(entity);
+            }
+
+            entry.State = state;
+        }
+    }
+
+3. Създавам си папка UnitOfWork и в нея си създавам interface IMessagesUnitOfWork
+
+public interface IMessagesUnitOfWork
+    {
+        IRepository<User> Users { get; }
+
+        IRepository<Channel> Channels { get; }
+
+        IRepository<ChannelMessage> ChannelMessages { get; }
+
+        IRepository<UserMessage> UserMessages { get; }
+
+        int SaveChanges();
+    }
+
+4. В същата папка си създавам клас MessagesUnitOfWork който имплементира interface IMessagesUnitOfWork
+
+public class MessagesUnitOfWork : IMessagesUnitOfWork
+    {
+        private readonly DbContext dbContext;
+
+        private readonly IDictionary<Type, object> repositories;
+
+        public MessagesUnitOfWork()
+            : this(new MessagesDbContext())
+        {
+        }
+
+        public MessagesUnitOfWork(DbContext dbContext)
+        {
+            this.dbContext = dbContext;
+            this.repositories = new Dictionary<Type, object>();
+        }
+
+        public IRepository<User> Users
+        {
+            get { return this.GetRepository<User>(); }
+        }
+
+        public IRepository<Channel> Channels
+        {
+            get { return this.GetRepository<Channel>(); }
+        }
+
+        public IRepository<ChannelMessage> ChannelMessages
+        {
+            get { return this.GetRepository<ChannelMessage>(); }
+        }
+
+        public IRepository<UserMessage> UserMessages
+        {
+            get { return this.GetRepository<UserMessage>(); }
+        }
+
+        public int SaveChanges()
+        {
+            return this.dbContext.SaveChanges();
+        }
+
+        public int SaveChangesAsync()
+        {
+            return this.dbContext.SaveChanges();
+        }
+
+        private IRepository<T> GetRepository<T>() where T : class
+        {
+            if (!this.repositories.ContainsKey(typeof(T)))
+            {
+                var type = typeof(GenericEfRepository<T>);
+                this.repositories.Add(typeof(T), 
+                    Activator.CreateInstance(type, this.dbContext));
+            }
+
+            return (IRepository<T>)this.repositories[typeof(T)];
+        }
+    }
+
+5. Връщам се в контролерите и разкачам базата, като през конструктора на съответният контролер му инджеквам новата,
+   локална база. Вече не работя през db context, а през data. И навсякъде в заявките добавям .All()
+
+private IMessagesUnitOfWork data;
+
+        public ChannelsController(IMessagesUnitOfWork data)
+        {
+            this.data = data;
+        }
+
+        public ChannelsController() 
+            : this (new MessagesUnitOfWork())
+        {        
+        }
+
+.....................................................................................................................
+Problem 18.	Write Unit Tests for "Get Channel by ID" Service
+Write unit tests with mocking for the "Get Channel by ID" REST service. 
+Use a fake or mocked repository and unit of work implementations. 
+Test the work of the Web API controller only. Your unit test should not access the database. 
+Ensure you cover all interesting cases. Put your tests in a new class called "ChannelUnitTestsWithMocking".
+
+[TestClass]
+    public class ChannelUnitTestsWithMocking
+    {
+        [TestMethod]
+        public void GetChannelById_MissingChannel_ShouldReturn404NotFound()
+        {
+            //Arrange
+            IMessagesUnitOfWork mockedUnitOfWork = new MessagesDataMock();
+
+            var channelsMock = mockedUnitOfWork.Channels;
+
+            channelsMock.Add(new Channel()
+            {
+                Id = 5,
+                Name = "CNN"
+            });
+
+            channelsMock.Add(new Channel()
+            {
+                Id = 6,
+                Name = "Russia Today"
+            });
+
+            //Act
+            var channelsController = new ChannelsController(mockedUnitOfWork);
+            this.SetupControllerForTesting(channelsController, "channels");
+            var httpResult = channelsController.GetChannel(12).ExecuteAsync(new CancellationToken()).Result;
+
+            //Assert
+            Assert.AreEqual(HttpStatusCode.NotFound, httpResult.StatusCode);
+        }
+
+        [TestMethod]
+        public void GetChannelById_ExistingChannel_ShoulReturn200OK()
+        {
+            //Arrange
+            IMessagesUnitOfWork mockedUnitOfWork = new MessagesDataMock();
+
+            var channelsMock = mockedUnitOfWork.Channels;
+
+            channelsMock.Add(new Channel()
+            {
+                Id = 5,
+                Name = "CNN"
+            });
+
+            channelsMock.Add(new Channel()
+            {
+                Id = 6,
+                Name = "Russia Today"
+            });
+
+            //Act
+            var channelsController = new ChannelsController(mockedUnitOfWork);
+            this.SetupControllerForTesting(channelsController, "channels");
+            var httpResult = channelsController.GetChannel(6).ExecuteAsync(new CancellationToken()).Result;
+            
+            
+            //Assert
+            Assert.AreEqual(HttpStatusCode.OK, httpResult.StatusCode);
+            var channel = httpResult.Content.ReadAsAsync<ChannelModel>().Result;
+            Assert.AreEqual(6, channel.Id);
+            Assert.AreEqual("Russia Today", channel.Name);
+        }
+
+        private void SetupControllerForTesting(ApiController controller, string controllerName)
+        {
+            string serverUrl = "http://sample-url.com";
+
+            // Setup the Request object of the controller
+            var request = new HttpRequestMessage()
+            {
+                RequestUri = new Uri(serverUrl)
+            };
+            controller.Request = request;
+
+            // Setup the configuration of the controller
+            var config = new HttpConfiguration();
+            config.Routes.MapHttpRoute(
+                name: "DefaultApi",
+                routeTemplate: "api/{controller}/{id}",
+                defaults: new { id = RouteParameter.Optional });
+            controller.Configuration = config;
+
+            // Apply the routes to the controller
+            controller.RequestContext.RouteData = new HttpRouteData(
+                route: new HttpRoute(),
+                values: new HttpRouteValueDictionary
+                {
+                    { "controller", controllerName }
+                });
+        }
+    }
+......................................................................................................................
+
+

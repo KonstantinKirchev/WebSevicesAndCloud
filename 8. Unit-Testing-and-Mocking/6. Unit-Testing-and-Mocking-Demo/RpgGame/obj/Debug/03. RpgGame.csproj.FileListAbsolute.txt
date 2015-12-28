@@ -1,0 +1,6 @@
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\8.Компонентно тестване и mocking\6. Unit-Testing-and-Mocking-Demo\RpgGame\bin\Debug\RpgGame.exe.config
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\8.Компонентно тестване и mocking\6. Unit-Testing-and-Mocking-Demo\RpgGame\bin\Debug\RpgGame.exe
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\8.Компонентно тестване и mocking\6. Unit-Testing-and-Mocking-Demo\RpgGame\bin\Debug\RpgGame.pdb
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\8.Компонентно тестване и mocking\6. Unit-Testing-and-Mocking-Demo\RpgGame\obj\Debug\03. RpgGame.csprojResolveAssemblyReference.cache
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\8.Компонентно тестване и mocking\6. Unit-Testing-and-Mocking-Demo\RpgGame\obj\Debug\RpgGame.exe
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\8.Компонентно тестване и mocking\6. Unit-Testing-and-Mocking-Demo\RpgGame\obj\Debug\RpgGame.pdb

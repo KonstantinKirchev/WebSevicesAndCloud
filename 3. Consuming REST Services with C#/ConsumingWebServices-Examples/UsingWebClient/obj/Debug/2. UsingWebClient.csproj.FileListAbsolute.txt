@@ -1,0 +1,1 @@
+C:\Users\Konstantin\Desktop\Software University\Web Sevices & Cloud\3.Consuming REST Services with C#\ConsumingWebServices-Examples\UsingWebClient\bin\Debug\UsingWebClient.exe.config
